@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kharcha Note</title>
+<meta name="theme-color" content="#0b0d12">
+<style>
+html{background:#0b0d12}
+:root{--bg:#0b0d12;--card:#161922;--text:#e8eaf1;--muted:#9097aa;--accent:#16a34a;--danger:#ef4444;--border:#262a36;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:16px;max-width:520px;margin-inline:auto}
+h1{font-size:1.3rem;margin:4px 0 14px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px}
+input{width:100%;padding:13px;margin-bottom:10px;font-size:1rem;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text)}
+button.add{width:100%;padding:14px;font-size:1rem;font-weight:600;border:0;border-radius:10px;background:var(--accent);color:#fff}
+.tot{display:flex;justify-content:space-between;gap:10px}
+.tot div{flex:1}
+.tot small{color:var(--muted);display:block}
+.tot b{font-size:1.25rem}
+.item{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)}
+.item:last-child{border-bottom:0}
+.item .m{flex:1;min-width:0}
+.item .r{font-weight:600;overflow-wrap:anywhere}
+.item .t{font-size:.8rem;color:var(--muted)}
+.item .a{font-weight:700}
+.item button{border:0;background:none;color:var(--danger);font-size:1.1rem;padding:6px}
+.item button.sure{background:var(--danger);color:#fff;border-radius:8px;font-size:.85rem;font-weight:600;padding:8px 10px}
+.empty{color:var(--muted);text-align:center;padding:16px 0}
+#msg{color:var(--danger);font-size:.9rem;margin-top:8px;min-height:1em}
+#clearBtn{width:100%;padding:13px;font-size:.95rem;font-weight:600;border:1px solid var(--danger);border-radius:10px;background:none;color:var(--danger);margin-bottom:14px}
+#clearBtn.sure{background:var(--danger);color:#fff}
+#hot{position:fixed;top:0;left:0;width:60px;height:60px;z-index:50;background:transparent}
+#dev{display:none;position:fixed;inset:0;z-index:100;background:var(--bg);overflow-y:auto;padding:16px;padding-top:calc(16px + env(safe-area-inset-top,0px))}
+#dev label{display:block;font-size:.8rem;color:var(--muted);margin:6px 0 3px}
+#dev .row{display:flex;gap:8px;margin-top:12px}
+#dev .row button{flex:1;padding:13px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:.95rem;font-weight:600}
+#dev .row button.p{background:var(--accent);color:#fff;border:0}
+#devStatus{font-size:.85rem;color:var(--muted);margin-top:10px;min-height:1.2em}
+</style>
+</head>
+<body>
+<div id="hot"></div>
+<h1 id="t_title"></h1>
+
+<div class="card">
+  <input id="reason" autocomplete="off">
+  <input id="amount" type="number" inputmode="decimal">
+  <button class="add" id="addBtn"></button>
+  <div id="msg"></div>
+</div>
+
+<div class="card tot">
+  <div><small id="t_todayLabel"></small><b id="today">₹0</b></div>
+  <div><small id="t_totalLabel"></small><b id="total">₹0</b></div>
+</div>
+
+<div class="card" id="list"></div>
+<button id="clearBtn"></button>
+
+<div id="dev">
+  <h1>🛠️ Developer</h1>
+  <div id="pwBox">
+    <label>Password</label>
+    <input id="pw" type="password" autocomplete="off">
+    <div class="row"><button id="pwOk" class="p">Open</button><button id="pwCancel">Cancel</button></div>
+    <div id="pwErr" style="color:var(--danger);font-size:.9rem;margin-top:8px"></div>
+  </div>
+  <div id="editBox" style="display:none">
+    <div id="fields"></div>
+    <div class="row"><button id="saveTxt" class="p">Save</button><button id="resetTxt">Default</button><button id="closeDev">Close</button></div>
+    <div id="devStatus"></div>
+  </div>
+</div>
+
+<script>
+var PASS="Yogi11";
+var DEF={
+  title:"💸 Kharcha Note",
+  reasonPh:"Kis liye? (jaise chai, auto)",
+  amountPh:"Kitne ₹?",
+  saveBtn:"Save karo",
+  todayLabel:"Aaj ka kharcha",
+  totalLabel:"Total kharcha",
+  empty:"Abhi koi kharcha note nahi hua",
+  clearBtn:"🗑️ Sab delete karke naya shuru karo",
+  clearSure:"Pakka? Sab hat jayega, dobara dabao",
+  delSure:"Pakka?",
+  errMsg:"Kis liye aur kitne, dono bharo"
+};
+var LABELS={title:"App ka title",reasonPh:"Kis liye wala box",amountPh:"Kitne wala box",saveBtn:"Save button",todayLabel:"Aaj ka kharcha (label)",totalLabel:"Total kharcha (label)",empty:"Khali list ka text",clearBtn:"Sab delete button",clearSure:"Sab delete confirm text",delSure:"Entry delete confirm",errMsg:"Error message"};
+var txt=JSON.parse(JSON.stringify(DEF));
+var KEY="kharcha_items",TKEY="kharcha_texts";
+var items=[];
+try{items=JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){items=[]}
+try{var st=JSON.parse(localStorage.getItem(TKEY)||"{}");for(var k in st)if(k in DEF&&typeof st[k]==="string")txt[k]=st[k]}catch(e){}
+var pending=null,pendingTimer=null,clearArmed=false,clearTimer=null,dbDoc=null;
+
+function save(){try{localStorage.setItem(KEY,JSON.stringify(items))}catch(e){}}
+function $(id){return document.getElementById(id)}
+function fmt(ts){
+  var d=new Date(ts);
+  return d.toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})+", "+
+         d.toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",hour12:true});
+}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+
+function applyTexts(){
+  $("t_title").textContent=txt.title;
+  document.title=txt.title.replace(/^[^\w\u0900-\u097F]+/,"")||"Kharcha Note";
+  $("reason").placeholder=txt.reasonPh;
+  $("amount").placeholder=txt.amountPh;
+  $("addBtn").textContent=txt.saveBtn;
+  $("t_todayLabel").textContent=txt.todayLabel;
+  $("t_totalLabel").textContent=txt.totalLabel;
+  $("clearBtn").textContent=clearArmed?txt.clearSure:txt.clearBtn;
+  render();
+}
+
+function render(){
+  var list=$("list"),total=0,today=0,td=new Date().toDateString();
+  items.forEach(function(i){total+=i.amount;if(new Date(i.ts).toDateString()===td)today+=i.amount});
+  $("total").textContent="₹"+total;
+  $("today").textContent="₹"+today;
+  $("clearBtn").style.display=items.length?"block":"none";
+  if(!items.length){list.innerHTML='<div class="empty">'+esc(txt.empty)+'</div>';return}
+  list.innerHTML=items.map(function(i){
+    var p=pending===String(i.ts);
+    return '<div class="item"><div class="m"><div class="r">'+esc(i.reason)+'</div><div class="t">'+fmt(i.ts)+'</div></div><div class="a">₹'+i.amount+'</div><button class="'+(p?"sure":"")+'" data-id="'+i.ts+'" aria-label="Delete">'+(p?esc(txt.delSure):"✕")+'</button></div>';
+  }).join("");
+}
+
+$("addBtn").onclick=function(){
+  var r=$("reason"),a=$("amount");
+  var reason=r.value.trim(),amount=parseFloat(a.value);
+  if(!reason||isNaN(amount)||amount<=0){$("msg").textContent=txt.errMsg;return}
+  $("msg").textContent="";
+  items.unshift({reason:reason,amount:amount,ts:Date.now()});
+  save();r.value="";a.value="";render();
+};
+$("list").onclick=function(e){
+  var id=e.target.getAttribute("data-id");
+  if(!id)return;
+  if(pending===id){
+    items=items.filter(function(i){return String(i.ts)!==id});
+    pending=null;save();render();
+  }else{
+    pending=id;render();
+    clearTimeout(pendingTimer);
+    pendingTimer=setTimeout(function(){pending=null;render()},3500);
+  }
+};
+$("clearBtn").onclick=function(){
+  if(clearArmed){
+    items=[];pending=null;clearArmed=false;clearTimeout(clearTimer);
+    $("clearBtn").classList.remove("sure");save();applyTexts();
+  }else{
+    clearArmed=true;$("clearBtn").classList.add("sure");applyTexts();
+    clearTimer=setTimeout(function(){clearArmed=false;$("clearBtn").classList.remove("sure");applyTexts()},4000);
+  }
+};
+
+/* ---- Developer (hidden) ---- */
+var taps=[];
+$("hot").onclick=function(){
+  var n=Date.now();
+  taps=taps.filter(function(t){return n-t<1500});
+  taps.push(n);
+  if(taps.length>=3){taps=[];openDev()}
+};
+function openDev(){
+  $("dev").style.display="block";
+  $("pwBox").style.display="block";
+  $("editBox").style.display="none";
+  $("pw").value="";$("pwErr").textContent="";
+}
+$("pwCancel").onclick=$("closeDev").onclick=function(){$("dev").style.display="none"};
+$("pwOk").onclick=function(){
+  if($("pw").value!==PASS){$("pwErr").textContent="Galat password";return}
+  $("pwBox").style.display="none";
+  $("editBox").style.display="block";
+  buildFields();
+};
+function buildFields(){
+  var h="";
+  for(var k in DEF){
+    h+='<label>'+esc(LABELS[k])+'</label><input data-k="'+k+'" value="'+esc(txt[k])+'">';
+  }
+  $("fields").innerHTML=h;
+  $("devStatus").textContent="";
+}
+function collect(){
+  var o={};
+  var ins=$("fields").querySelectorAll("input");
+  for(var i=0;i<ins.length;i++){var v=ins[i].value;o[ins[i].getAttribute("data-k")]=v.trim()?v:DEF[ins[i].getAttribute("data-k")]}
+  return o;
+}
+function persist(o,status){
+  txt=o;
+  try{localStorage.setItem(TKEY,JSON.stringify(o))}catch(e){}
+  applyTexts();
+  if(!dbDoc){status.textContent="Sirf is browser me save hua. Dusre browser me dikhane ke liye Claude account me login chahiye.";return}
+  dbDoc.set(o).then(function(){status.textContent="Save ho gaya (sab browsers me dikhega)"}).catch(function(){
+    status.textContent="Sirf is browser me save hua. Sab jagah ke liye wahi Claude account se kholo jisme ye app bana hai."});
+}
+$("saveTxt").onclick=function(){persist(collect(),$("devStatus"))};
+$("resetTxt").onclick=function(){persist(JSON.parse(JSON.stringify(DEF)),$("devStatus"));buildFields()};
+
+applyTexts();
+</script>
+</body>
+</html>

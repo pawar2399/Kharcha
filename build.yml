@@ -1,0 +1,38 @@
+name: Build APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Prepare web files
+        run: |
+          mkdir -p www
+          cp index.html www/index.html
+      - name: Create Android project
+        run: |
+          npm init -y
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          npx cap init "Kharcha Note" com.kharcha.note --web-dir=www
+          npx cap add android
+          npx cap sync android
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+      - name: Publish APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          files: android/app/build/outputs/apk/debug/app-debug.apk
